@@ -115,7 +115,7 @@ with st.sidebar:
     # Log Viewer
     st.markdown("**System Logs**")
     log_container = st.empty()
-    log_container.text_area("", value="\n".join(st.session_state.logs), height=150, disabled=True, label_visibility="collapsed")
+    log_container.text_area("System Logs", value="\n".join(st.session_state.logs), height=150, disabled=True, label_visibility="collapsed")
 
 # --- MAIN UI ---
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>⚡ LIVE MARKET DASHBOARD</h1>", unsafe_allow_html=True)
@@ -144,7 +144,7 @@ with col_chart:
 with col_reason:
     st.subheader("AI Analysis & Reasoning")
     reasoning_placeholder = st.empty()
-    reasoning_placeholder.text_area("", "Awaiting data...", height=350, disabled=True, label_visibility="collapsed")
+    reasoning_placeholder.text_area("AI Reasoning", "Awaiting data...", height=350, disabled=True, label_visibility="collapsed")
 
 
 # --- LIVE LOOP ---
