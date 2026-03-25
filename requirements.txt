@@ -3,3 +3,6 @@ pandas
 requests
 matplotlib
 feedparser
+yfinance
+python-dotenv
+scikit-learn

@@ -2,7 +2,6 @@ import os
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
-from fpdf import FPDF
 from dotenv import load_dotenv
 
 # Load environment variables for other potential modules
