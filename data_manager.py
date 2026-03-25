@@ -11,6 +11,12 @@ load_dotenv()
 COINGECKO_BASE_URL = "https://api.coingecko.com/api/v3/simple/price"
 CSV_FILE = "history.csv"
 
+# --- Price Cache ---
+price_cache = {
+    "last_fetch_time": None,
+    "price": None
+}
+
 def get_coingecko_price(coin_id):
     """
     Fetches price from CoinGecko.
@@ -31,10 +37,14 @@ def get_coingecko_price(coin_id):
 
 def fetch_current_price(coin):
     """
-    Fetches the current price from CoinGecko.
+    Fetches the current price from CoinGecko with a 60-second cache.
     coin: 'BTC' or 'ETH'
     Returns: (price, source) or (None, None)
     """
+    now = datetime.now()
+    if price_cache["last_fetch_time"] and (now - price_cache["last_fetch_time"]) < timedelta(seconds=60):
+        return price_cache["price"], "Cache"
+
     mapping = {
         'BTC': {'coingecko': 'bitcoin'},
         'ETH': {'coingecko': 'ethereum'}
@@ -47,6 +57,8 @@ def fetch_current_price(coin):
     
     price = get_coingecko_price(config['coingecko'])
     if price is not None:
+        price_cache["price"] = price
+        price_cache["last_fetch_time"] = now
         return price, "CoinGecko"
         
     return None, None

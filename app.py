@@ -199,5 +199,5 @@ if st.session_state.is_running:
         
     # --- 4. Schedule Rerun ---
     elapsed = time.time() - loop_start
-    time.sleep(max(0.1, 2.0 - elapsed)) # Ensure a minimum loop time
+    time.sleep(max(0.1, 15.0 - elapsed)) # Ensure a minimum loop time
     st.rerun()
