@@ -65,7 +65,7 @@ st.markdown("""
     }
     div[data-testid="stMetricDelta"] { font-weight: 700 !important; }
 
-    /* --- CRITICAL FIX: TEXT AREAS (LOGS & AI REASONING) --- */
+    /* TEXT AREAS (LOGS) */
     div[data-testid="stTextArea"] textarea {
         background-color: #1A202C !important;
         color: #FAFAFA !important; /* Bright text */
@@ -82,12 +82,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# --- Session State Initialization ---
+# --- Session State Initialization (Removed reasoning_text) ---
 for key, default_value in [
     ("is_running", False), ("selected_coin", "BTC"),
     ("historical_df", pd.DataFrame()), ("session_df", pd.DataFrame()),
-    ("plot_prices", []), ("logs", []),
-    ("reasoning_text", "Awaiting data...")
+    ("plot_prices", []), ("logs", [])
 ]:
     if key not in st.session_state:
         st.session_state[key] = default_value
@@ -146,9 +145,10 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("**System Logs**")
-    st.text_area("log_output", "\n".join(st.session_state.logs), height=200, key="log_area", disabled=True, label_visibility="collapsed")
+    # Increased height of the log box
+    st.text_area("log_output", "\n".join(st.session_state.logs), height=350, key="log_area", disabled=True, label_visibility="collapsed")
 
-# --- Main Dashboard UI ---
+# --- Main Dashboard UI (Simplified) ---
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>⚡ LIVE MARKET DASHBOARD</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #A0AEC0; margin-bottom: 2rem;'>AI-Powered Cryptocurrency Forecasting & Order Flow Analysis</p>", unsafe_allow_html=True)
 
@@ -162,16 +162,10 @@ pred_placeholder.metric(f"Forecast ({target_minutes}m)", "--- USD")
 sentiment_placeholder.metric("Market Sentiment", "---")
 
 st.markdown("---")
-col_chart, col_reason = st.columns([2, 1])
 
-with col_chart:
-    st.subheader("Live Price Chart")
-    chart_placeholder = st.empty()
-
-with col_reason:
-    st.subheader("AI Analysis & Reasoning")
-    reasoning_placeholder = st.empty()
-    reasoning_placeholder.text_area("reasoning_output", st.session_state.reasoning_text, height=350, key="reasoning_area", disabled=True, label_visibility="collapsed")
+# Chart now takes up the full width
+st.subheader("Live Price Chart")
+chart_placeholder = st.empty()
 
 # --- Main Application Loop ---
 if st.session_state.is_running:
@@ -180,6 +174,7 @@ if st.session_state.is_running:
         coin = st.session_state.selected_coin
         score, _ = news_manager.get_sentiment()
         price, source = data_manager.fetch_current_price(coin)
+        pred_val = None # Initialize pred_val
 
         if price:
             st.session_state.plot_prices.append(price)
@@ -188,13 +183,15 @@ if st.session_state.is_running:
             st.session_state.session_df = pd.concat([st.session_state.session_df, pd.DataFrame([new_row])], ignore_index=True)
             
             sentiment = news_manager.manager.sentiment_score
-            pred_val, ai_reasoning = predictor.analyze_and_predict(st.session_state.historical_df, st.session_state.session_df, target_minutes, sentiment)
-            st.session_state.reasoning_text = ai_reasoning if pred_val else "AI is gathering initial data to build a stable forecast. Prediction will appear here shortly..."
+            # Removed ai_reasoning from the output
+            pred_val, _ = predictor.analyze_and_predict(st.session_state.historical_df, st.session_state.session_df, target_minutes, sentiment)
 
         sentiment_placeholder.metric("Market Sentiment", f"{score:+.2f}")
         if price:
             price_placeholder.metric(f"Current Price ({coin})", f"${price:,.2f}")
-            fig, ax = plt.subplots(figsize=(8, 4))
+            
+            # Increased chart size for the wider layout
+            fig, ax = plt.subplots(figsize=(12, 5))
             
             if pred_val:
                 delta = pred_val - price
@@ -225,13 +222,11 @@ if st.session_state.is_running:
             if prices:
                 ax.axhline(y=prices[-1], color='red', linestyle='--', linewidth=1, zorder=4, label=f"Current: ${prices[-1]:,.2f}")
             
-            # --- IMPROVED CHART LEGEND ---
-            ax.legend(prop={'weight': 'bold', 'size': 'small'}, frameon=True, facecolor='#1A202C', edgecolor='#2D3748', labelcolor='white')
+            # Increased legend font size for better readability in the larger chart
+            ax.legend(prop={'weight': 'bold', 'size': 'medium'}, frameon=True, facecolor='#1A202C', edgecolor='#2D3748', labelcolor='white')
             
             chart_placeholder.pyplot(fig)
             plt.close(fig)
-
-        reasoning_placeholder.text_area("reasoning_output", st.session_state.reasoning_text, height=350, key="reasoning_area_updated", disabled=True, label_visibility="collapsed")
 
     except Exception as e:
         log_msg("FATAL ERROR: Tracking stopped.")
