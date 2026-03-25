@@ -245,7 +245,7 @@ if st.session_state.is_running:
             time.sleep(sleep_amount)
 
     except Exception as e:
-        # If any unexpected error occurs, hide traceback and notify cleanly.
-        log_msg(f"System interupt handling stream. Re-syncing...")
+        # If any unexpected error occurs, log the actual error and restart.
+        log_msg(f"ERROR: {e}. Re-syncing...")
         time.sleep(2)
         st.rerun()
