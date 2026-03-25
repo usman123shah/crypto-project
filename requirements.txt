@@ -1,9 +1,5 @@
 streamlit
 pandas
-scikit-learn
 requests
-fpdf
-python-dotenv
 matplotlib
-yfinance
 feedparser

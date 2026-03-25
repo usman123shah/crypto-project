@@ -1,3 +1,4 @@
+
 import streamlit as st
 import time
 import pandas as pd
@@ -156,9 +157,38 @@ if st.session_state.is_running:
 
             # --- Chart Drawing Logic ---
             fig, ax = plt.subplots(figsize=(8, 4))
+            prices = st.session_state.plot_prices
+            
+            # Polished Styling
             fig.patch.set_facecolor('#0E1117')
             ax.set_facecolor('#0E1117')
-            # ... (chart styling) ...
+            
+            # Plot the main price line
+            ax.plot(prices, color='#00d2ff', linewidth=2, zorder=3)
+            
+            # Add a subtle gradient fill below the line
+            x = np.arange(len(prices))
+            y = np.array(prices)
+            ax.fill_between(x, y, color='#00d2ff', alpha=0.1, zorder=2)
+            
+            # Grid and Ticks
+            ax.grid(True, which='both', linestyle='--', linewidth=0.5, color='#4A5568', zorder=1)
+            ax.tick_params(axis='x', colors='white')
+            ax.tick_params(axis='y', colors='white')
+            
+            # Spines (borders)
+            for spine in ax.spines.values():
+                spine.set_edgecolor('#2D3748')
+                
+            # Labels
+            ax.set_ylabel("Price (USD)", color='white')
+            ax.set_xlabel("Time (Recent Updates)", color='white')
+
+            # Add a horizontal line for the latest price
+            if prices:
+                ax.axhline(y=prices[-1], color='red', linestyle='--', linewidth=1, zorder=4, label=f"Current: ${prices[-1]:,.2f}")
+                ax.legend(facecolor='#1A202C', edgecolor='none', labelcolor='white')
+            
             chart_placeholder.pyplot(fig)
             plt.close(fig)
 
