@@ -85,7 +85,6 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Start / Stop Logic
     st.markdown("### 🚦 Controls")
     if st.session_state.is_running:
         if st.button("🔴 STOP TRACKING", use_container_width=True, key="btn_stop"):
@@ -115,7 +114,8 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**System Logs**")
     log_container = st.empty()
-    log_container.text_area("Logs", "\n".join(st.session_state.logs), height=150, key="log_area_sidebar")
+    # Initialize the log area
+    log_container.text_area("log_output", "\n".join(st.session_state.logs), height=150, key="log_area", disabled=True, label_visibility="collapsed")
 
 # --- MAIN UI ---
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>⚡ LIVE MARKET DASHBOARD</h1>", unsafe_allow_html=True)
@@ -140,7 +140,8 @@ with col_chart:
 with col_reason:
     st.subheader("AI Analysis & Reasoning")
     reasoning_placeholder = st.empty()
-    reasoning_placeholder.text_area("AI Reasoning", "Awaiting data...", height=350, key="reasoning_area_main", disabled=True)
+    # Initialize the reasoning area
+    reasoning_placeholder.text_area("reasoning_output", "Awaiting data...", height=350, key="reasoning_area", disabled=True, label_visibility="collapsed")
 
 # --- LIVE LOOP ---
 if st.session_state.is_running:
@@ -172,7 +173,8 @@ if st.session_state.is_running:
                 if pred_val:
                     delta = pred_val - price
                     pred_placeholder.metric(f"Forecast ({target_minutes}m)", f"${pred_val:,.2f}", f"{delta:+.2f} USD")
-                    reasoning_placeholder.text_area("AI Reasoning", ai_reasoning, height=350, key="reasoning_area_loop", disabled=True)
+                    # Update reasoning area using the SAME key
+                    reasoning_placeholder.text_area("reasoning_output", ai_reasoning, height=350, key="reasoning_area", disabled=True, label_visibility="collapsed")
                 else:
                     pred_placeholder.metric(f"Forecast ({target_minutes}m)", "Gathering data...")
                 
@@ -199,7 +201,8 @@ if st.session_state.is_running:
                 chart_placeholder.pyplot(fig)
                 plt.close(fig)
                 
-            log_container.text_area("Logs", "\n".join(st.session_state.logs), height=150, key="log_area_loop")
+            # Update log area using the SAME key
+            log_container.text_area("log_output", "\n".join(st.session_state.logs), height=150, key="log_area", disabled=True, label_visibility="collapsed")
             
             elapsed = time.time() - loop_start
             sleep_amount = max(0.1, 2.0 - elapsed)
