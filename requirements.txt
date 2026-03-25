@@ -1,4 +1,4 @@
-customtkinter
+streamlit
 pandas
 scikit-learn
 requests
@@ -7,4 +7,3 @@ python-dotenv
 matplotlib
 yfinance
 feedparser
-streamlit>=1.30.0

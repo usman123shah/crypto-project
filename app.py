@@ -94,18 +94,25 @@ with st.sidebar:
             st.rerun()
     else:
         if st.button("🟢 START TRACKING", use_container_width=True):
-            # Check if coin changed to reload history
+            # If coin changed, or historical data is empty, reload
             if st.session_state.selected_coin != selected_coin or st.session_state.historical_df.empty:
-                 st.session_state.selected_coin = selected_coin
-                 log_msg(f"Loading 1-Year History for {selected_coin}...")
-                 try:
-                     st.session_state.historical_df = data_manager.get_historical_data(selected_coin)
-                     st.session_state.session_df = data_manager.load_data()
-                     log_msg(f"Loaded {len(st.session_state.historical_df)} days of history.")
-                 except Exception as e:
-                     log_msg(f"Error loading history: {e}")
-            
-            st.session_state.plot_prices = [] # Reset plot for new session
+                st.session_state.selected_coin = selected_coin
+                log_msg(f"Loading 1-Year History for {selected_coin}...")
+                try:
+                    # Load the big historical dataset
+                    st.session_state.historical_df = data_manager.get_historical_data(selected_coin)
+                    log_msg(f"Loaded {len(st.session_state.historical_df)} days of history.")
+                    
+                    # IMPORTANT FIX: Always start with a clean session dataframe
+                    st.session_state.session_df = pd.DataFrame() 
+                    
+                except Exception as e:
+                    log_msg(f"Error loading history: {e}")
+                    st.session_state.is_running = False # Don't start if history fails
+                    st.rerun()
+
+            # Reset plot for new session regardless
+            st.session_state.plot_prices = [] 
             st.session_state.is_running = True
             log_msg("Started high-frequency tracking...")
             st.rerun()
