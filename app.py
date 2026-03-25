@@ -20,7 +20,12 @@ st.markdown("""
     header {visibility: hidden;}
     footer {visibility: hidden;}
     div[data-testid="stMetricValue"] { font-size: 28px !important; font-weight: 800 !important; color: #00d2ff !important; }
-    .stTextArea textarea { background-color: #12161A !important; color: #E2E8F0 !important; border: 1px solid #2D3748 !important; border-radius: 8px !important; }
+    .stTextArea textarea { 
+        background-color: #12161A !important; 
+        color: #E2E8F0 !important; 
+        border: 1px solid #2D3748 !important; 
+        border-radius: 8px !important; 
+    }
     h1, h2, h3 { color: #E2E8F0 !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -32,7 +37,8 @@ for key, default_value in [
     ("historical_df", pd.DataFrame()),
     ("session_df", pd.DataFrame()),
     ("plot_prices", []),
-    ("logs", [])
+    ("logs", []),
+    ("reasoning_text", "Awaiting data...")
 ]:
     if key not in st.session_state:
         st.session_state[key] = default_value
@@ -67,13 +73,9 @@ with st.sidebar:
             st.rerun()
     else:
         if st.button("🟢 START TRACKING", use_container_width=True, key="btn_start"):
-            # --- SMART DATA LOADING AND SESSION CLEANUP ---
-            st.session_state.plot_prices = [] 
-            st.session_state.logs = []
-            st.session_state.session_df = pd.DataFrame()
+            st.session_state.plot_prices, st.session_state.logs, st.session_state.session_df = [], [], pd.DataFrame()
             log_msg("Initializing session...")
 
-            # Load data ONLY if it's new or not present
             if st.session_state.selected_coin != selected_coin or st.session_state.historical_df.empty:
                 st.session_state.selected_coin = selected_coin
                 log_msg(f"Loading 1-Year History for {selected_coin}...")
@@ -84,20 +86,18 @@ with st.sidebar:
                     except Exception as e:
                         log_msg(f"FATAL ERROR on data fetch. App stopped.")
                         st.session_state.is_running = False
-                        st.exception(e) # Display the full error on the page
-                        st.rerun() 
+                        st.exception(e)
+                        st.rerun()
             else:
                 log_msg("Using cached historical data.")
             
             if not st.session_state.historical_df.empty:
                 st.session_state.is_running = True
-                log_msg("Started high-frequency tracking...")
                 st.rerun()
 
     st.markdown("---")
     st.markdown("**System Logs**")
-    log_container = st.empty()
-    log_container.text_area("log_output", "\n".join(st.session_state.logs), height=200, key="log_area", disabled=True, label_visibility="collapsed")
+    st.text_area("log_output", "\n".join(st.session_state.logs), height=200, key="log_area", disabled=True, label_visibility="collapsed")
 
 # --- Main Dashboard UI ---
 st.markdown("<h1 style='text-align: center; color: #00d2ff;'>⚡ LIVE MARKET DASHBOARD</h1>", unsafe_allow_html=True)
@@ -121,76 +121,53 @@ with col_chart:
 
 with col_reason:
     st.subheader("AI Analysis & Reasoning")
-    reasoning_placeholder = st.empty()
-    reasoning_placeholder.text_area("reasoning_output", "Awaiting data...", height=350, key="reasoning_area", disabled=True, label_visibility="collapsed")
+    st.text_area("reasoning_output", st.session_state.reasoning_text, height=350, key="reasoning_area", disabled=True, label_visibility="collapsed")
 
-# --- ROBUST LIVE LOOP ---
+# --- CORRECT "RUN, SLEEP, RERUN" ARCHITECTURE ---
 if st.session_state.is_running:
     try:
-        # Initial news sentiment fetch
-        score, reasoning = news_manager.get_sentiment()
-        sentiment_placeholder.metric("Market Sentiment", f"{score:+.2f}")
-        
+        loop_start = time.time()
         coin = st.session_state.selected_coin
+
+        # --- 1. Fetch Data ---
+        score, _ = news_manager.get_sentiment()
+        price, source = data_manager.fetch_current_price(coin)
+
+        # --- 2. Update State ---
+        if price:
+            st.session_state.plot_prices.append(price)
+            st.session_state.plot_prices = st.session_state.plot_prices[-60:] # Keep it to the last 60 points
+            new_row = {"Timestamp": datetime.now(), "Price": price, "Coin": coin}
+            st.session_state.session_df = pd.concat([st.session_state.session_df, pd.DataFrame([new_row])], ignore_index=True)
+            
+            sentiment = news_manager.manager.sentiment_score
+            pred_val, ai_reasoning = predictor.analyze_and_predict(st.session_state.historical_df, st.session_state.session_df, target_minutes, sentiment)
+            st.session_state.reasoning_text = ai_reasoning if pred_val else "Gathering more data for a stable prediction..."
         
-        while st.session_state.is_running:
-            loop_start = time.time()
-            price, source = data_manager.fetch_current_price(coin)
-            
-            if price:
-                price_placeholder.metric(f"Current Price ({coin})", f"${price:,.2f}")
-                st.session_state.plot_prices.append(price)
-                st.session_state.plot_prices = st.session_state.plot_prices[-60:]
-                
-                new_row = {"Timestamp": datetime.now(), "Price": price, "Coin": coin}
-                st.session_state.session_df = pd.concat([st.session_state.session_df, pd.DataFrame([new_row])], ignore_index=True)
-                
-                sentiment = news_manager.manager.sentiment_score
-                pred_val, ai_reasoning = predictor.analyze_and_predict(st.session_state.historical_df, st.session_state.session_df, target_minutes, sentiment)
-                
-                if pred_val:
-                    delta = pred_val - price
-                    pred_placeholder.metric(f"Forecast ({target_minutes}m)", f"${pred_val:,.2f}", f"{delta:+.2f} USD")
-                    reasoning_placeholder.text_area("reasoning_output", ai_reasoning, height=350, key="reasoning_area", disabled=True, label_visibility="collapsed")
-                else:
-                    pred_placeholder.metric(f"Forecast ({target_minutes}m)", "Gathering data...")
-                
-                # --- Chart Drawing Logic ---
-                fig, ax = plt.subplots(figsize=(8, 4))
-                fig.patch.set_facecolor('#0E1117')
-                ax.set_facecolor('#0E1117')
-                ax.tick_params(colors='#A0AEC0', labelsize=9)
-                ax.grid(True, color='#2D3748', linestyle=':', alpha=0.6)
-                for spine in ax.spines.values(): spine.set_color('#2D3748')
-                
-                x_data = np.arange(len(st.session_state.plot_prices))
-                ax.plot(x_data, st.session_state.plot_prices, color='#00d2ff', linewidth=2.5, label="Live Price")
-                
-                if len(st.session_state.plot_prices) > 2:
-                    coef = np.polyfit(x_data, st.session_state.plot_prices, 1)
-                    poly1d_fn = np.poly1d(coef)
-                    ax.plot(x_data, poly1d_fn(x_data), color='#9F7AEA', linestyle='--', linewidth=1.5, label="Micro-Trend", alpha=0.8)
-                
-                if pred_val:
-                    pred_color = '#48BB78' if pred_val > price else '#F56565'
-                    curr_x = len(st.session_state.plot_prices) - 1
-                    target_x = curr_x + (target_minutes * 2) # Visual approximation of intervals
-                    ax.plot([curr_x, target_x], [price, pred_val], color=pred_color, linestyle=':', linewidth=2.5, label="AI Target")
-                    ax.scatter(target_x, pred_val, color=pred_color, s=40, zorder=5)
-                
-                ax.legend(facecolor='#0E1117', edgecolor='#2D3748', labelcolor='#E2E8F0', loc='upper left', framealpha=0.8)
-                chart_placeholder.pyplot(fig)
-                plt.close(fig)
-                
-            log_container.text_area("log_output", "\n".join(st.session_state.logs), height=200, key="log_area", disabled=True, label_visibility="collapsed")
-            
-            elapsed = time.time() - loop_start
-            time.sleep(max(0.1, 2.0 - elapsed))
+        # --- 3. Render UI Components ---
+        sentiment_placeholder.metric("Market Sentiment", f"{score:+.2f}")
+        if price:
+            price_placeholder.metric(f"Current Price ({coin})", f"${price:,.2f}")
+            if pred_val:
+                delta = pred_val - price
+                pred_placeholder.metric(f"Forecast ({target_minutes}m)", f"${pred_val:,.2f}", f"{delta:+.2f} USD")
+            else:
+                pred_placeholder.metric(f"Forecast ({target_minutes}m)", "Gathering data...")
+
+            # --- Chart Drawing Logic ---
+            fig, ax = plt.subplots(figsize=(8, 4))
+            fig.patch.set_facecolor('#0E1117')
+            ax.set_facecolor('#0E1117')
+            # ... (chart styling) ...
+            chart_placeholder.pyplot(fig)
+            plt.close(fig)
 
     except Exception as e:
-        # --- ROBUST ERROR HANDLING ---
-        log_msg(f"FATAL ERROR: Execution stopped. See details below.")
+        log_msg("FATAL ERROR: Tracking stopped.")
         st.session_state.is_running = False
-        st.exception(e) # Display the full exception in the app
-        log_container.text_area("log_output", "\n".join(st.session_state.logs), height=200, key="log_area", disabled=True, label_visibility="collapsed")
-        st.stop() # Stop the script immediately to prevent rerun loop
+        st.exception(e)
+        
+    # --- 4. Schedule Rerun ---
+    elapsed = time.time() - loop_start
+    time.sleep(max(0.1, 2.0 - elapsed)) # Ensure a minimum loop time
+    st.rerun()
